@@ -11,7 +11,7 @@ SALDO_LABEL_REGEX = re.compile(r"^\d+\s*SALDO$", re.IGNORECASE)
 # =============================
 def guess_gender(name):
     name = name.lower()
-    female = ["sri", "wati", "ani", "eni", "wulandari", "sari", "asri", "junitasari"]
+    female = ["sri","wati","ani","eni","wulandari","sari","asri","junitasari"]
     return "Perempuan" if any(w in name for w in female) else "Laki-laki"
 
 
@@ -35,15 +35,10 @@ def clean_kota(value):
         return ""
 
     value = value.upper().strip()
-
-    # Hapus prefix umum
     value = re.sub(r"^(KOTA\s+ADM\.?\s*)", "", value)
     value = re.sub(r"^(KOTA\s+ADMINISTRASI\s*)", "", value)
     value = re.sub(r"^(KOTA\s*)", "", value)
     value = re.sub(r"^(KABUPATEN\s*)", "", value)
-
-    # Hapus karakter aneh (hanya huruf & spasi)
-    value = re.sub(r"[^A-Z\s]", "", value)
 
     return value.strip()
 
@@ -53,33 +48,27 @@ def clean_kota(value):
 # =============================
 def parse(text: str) -> pd.DataFrame:
 
-    # =============================
-    # CLEAN TEXT GLOBAL
-    # =============================
+    # CLEAN TEXT
     text = re.sub(r"[\u200e\u200f\u202a-\u202e]", "", text)
     text = re.sub(r"[\u2600-\u27BF]", "", text)
 
-    # Hapus format timestamp WhatsApp
-    text = re.sub(
-        r'\d{1,2}/\d{1,2}/\d{2,4}\s+\d{1,2}[\.:]\d{2}\s+-\s+.*?:',
-        '',
-        text
-    )
+    # FORMAT EXPORT LAMA (nama ATAU nomor)
+    pattern1 = r"\d{2}/\d{2}/\d{2}\s+\d{2}\.\d{2}\s+-\s+.*?:\s*"
 
-    # =============================
-    # SPLIT BERDASARKAN NIK
-    # =============================
-    blocks = re.split(r'(?=NIK\s*:)', text, flags=re.IGNORECASE)
+    # FORMAT COPY PASTE / BRACKET
+    pattern2 = r"\[\d{1,2}\.\d{2},\s*\d{1,2}/\d{1,2}/\d{4}\]\s*.*?:\s*"
+
+    blocks = re.split(f"{pattern1}|{pattern2}", text)
 
     data = []
 
     for block in blocks:
 
-        if "NIK" not in block.upper():
-            continue
-
         lines = [l.strip() for l in block.split("\n") if l.strip()]
         full_block_text = " ".join(lines)
+
+        if not any("NIK" in l.upper() for l in lines):
+            continue
 
         nama = nik = ttl = email = ""
         perusahaan = periode = ""
@@ -97,10 +86,10 @@ def parse(text: str) -> pd.DataFrame:
             upper = line.upper()
 
             if upper.startswith("NAMA"):
-                nama = line.split(":", 1)[1].strip()
+                nama = line.split(":",1)[1].strip()
 
             elif re.match(r"^NIK\s*:", line, re.IGNORECASE):
-                nik = re.sub(r"\D", "", line.split(":", 1)[1])
+                nik = re.sub(r"\D", "", line.split(":",1)[1])
 
             elif upper.startswith("TTL"):
                 match = re.search(r"\d{2}-\d{2}-\d{4}", line)
@@ -161,9 +150,9 @@ def parse(text: str) -> pd.DataFrame:
             periode = lines[idx]
             idx += 1
 
-        # =============================
-        # LABEL DETECTION
-        # =============================
+        # ==========================================================
+        # PRIORITAS 1 — LABEL DETECTION
+        # ==========================================================
         kel_match = re.search(
             r"KELURAHAN\s*:\s*(.*?)(?=\s+KECAMATAN|\s+KOTA|\s+KABUPATEN|$)",
             full_block_text,
@@ -182,23 +171,33 @@ def parse(text: str) -> pd.DataFrame:
             re.IGNORECASE
         )
 
+        label_found = False
+
         if kel_match:
             kelurahan = kel_match.group(1).strip()
+            label_found = True
 
         if kec_match:
             kecamatan = kec_match.group(1).strip()
+            label_found = True
 
         if kota_match:
             kota = kota_match.group(2).strip()
+            label_found = True
 
-            # Potong jika ada sisa tanggal / jam / nomor
-            kota = re.split(
-                r'\d{1,2}/\d{1,2}/\d{2,4}|\+\d+|\d{1,2}[\.:]\d{2}',
-                kota
-            )[0].strip()
-
-            # Bersihkan karakter aneh
-            kota = re.sub(r"[^A-Z\s]", "", kota.upper()).strip()
+        # ==========================================================
+        # PRIORITAS 2 — FALLBACK
+        # ==========================================================
+        if not label_found:
+            while idx < len(lines):
+                line = lines[idx].strip()
+                if not kota:
+                    kota = line
+                elif not kelurahan:
+                    kelurahan = line
+                elif not kecamatan:
+                    kecamatan = line
+                idx += 1
 
         # =============================
         # HITUNG SALDO
