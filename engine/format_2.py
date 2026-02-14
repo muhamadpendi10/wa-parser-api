@@ -48,19 +48,17 @@ def clean_kota(value):
 # =============================
 def parse(text: str) -> pd.DataFrame:
 
-    # =============================
     # CLEAN TEXT
-    # =============================
     text = re.sub(r"[\u200e\u200f\u202a-\u202e]", "", text)
     text = re.sub(r"[\u2600-\u27BF]", "", text)
 
-    # =============================
-    # SPLIT BLOCK WHATSAPP FORMAT 2
-    # =============================
-    blocks = re.split(
-        r"\d{2}/\d{2}/\d{2}\s+\d{2}\.\d{2}\s+-\s+\+\d.*?:\s*",
-        text
-    )
+    # FORMAT EXPORT LAMA (nama ATAU nomor)
+    pattern1 = r"\d{2}/\d{2}/\d{2}\s+\d{2}\.\d{2}\s+-\s+.*?:\s*"
+
+    # FORMAT COPY PASTE / BRACKET
+    pattern2 = r"\[\d{1,2}\.\d{2},\s*\d{1,2}/\d{1,2}/\d{4}\]\s*.*?:\s*"
+
+    blocks = re.split(f"{pattern1}|{pattern2}", text)
 
     data = []
 

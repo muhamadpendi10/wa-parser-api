@@ -81,8 +81,8 @@ def parse_from_text(payload: ParseTextRequest):
 # ============================
 @app.post("/parse-text-raw")
 def parse_text_raw(
-    text: str = Form(..., media_type="text/plain"),
-    format_type: str = Form("format_1")
+    text: str = Body(..., media_type="text/plain"),
+    format_type: str = "format_1"
 ):
     text = text.strip()
 
