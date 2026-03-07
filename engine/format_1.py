@@ -7,7 +7,7 @@ import pandas as pd
 # =============================
 def guess_gender(name):
     name = name.lower()
-    female = ["sri","wati","ani","eni","wulandari","sari","asri","junitasari"]
+    female = ["sri", "wati", "ani", "eni", "wulandari", "sari", "asri", "junitasari"]
     return "Perempuan" if any(w in name for w in female) else "Laki-laki"
 
 
@@ -48,7 +48,7 @@ def parse(text: str) -> pd.DataFrame:
     # CLEAN TEXT
     text = re.sub(r"[\u200e\u200f\u202a-\u202e]", "", text)
     text = re.sub(r"[\u2600-\u27BF]", "", text)
-    text = text.replace("⭐","")
+    text = text.replace("⭐", "")
 
     pattern1 = r"\d{2}/\d{2}/\d{2}\s+\d{2}\.\d{2}\s+-\s+.*?:\s*"
     pattern2 = r"\[\d{1,2}\.\d{2},\s*\d{1,2}/\d{1,2}/\d{4}\]\s*.*?:\s*"
@@ -94,36 +94,33 @@ def parse(text: str) -> pd.DataFrame:
         if desa_match:
             kelurahan = desa_match.group(1).strip()
 
-        # FIX jika kepanjangan
         if not kelurahan or len(kelurahan) > 40:
             for l in lines:
                 if l.upper().startswith("DESA"):
-                    kelurahan = l.split(":",1)[1].strip()
+                    kelurahan = l.split(":", 1)[1].strip()
                     break
 
         if not kecamatan or len(kecamatan) > 40:
             for l in lines:
                 if l.upper().startswith("KEC"):
-                    kecamatan = l.split(":",1)[1].strip()
+                    kecamatan = l.split(":", 1)[1].strip()
                     break
 
         if not kota or len(kota) > 60:
             for l in lines:
                 if l.upper().startswith("KOTA"):
-                    kota = l.split(":",1)[1].strip()
+                    kota = l.split(":", 1)[1].strip()
                     break
 
-        # FIX desa baris bawah
         if not kelurahan:
-            for i,l in enumerate(lines):
+            for i, l in enumerate(lines):
                 if "DESA" in l.upper():
-                    if i+1 < len(lines):
-                        kandidat = lines[i+1].strip()
+                    if i + 1 < len(lines):
+                        kandidat = lines[i + 1].strip()
                         if not re.fullmatch(r"\d{6,}", kandidat):
                             kelurahan = kandidat
                             break
 
-        # POTONG jika nyambung
         if kota:
             kota = re.split(r"\bKEC\b|\bDESA\b|\bSTATUS\b|\d{16}", kota)[0].strip()
 
@@ -148,17 +145,17 @@ def parse(text: str) -> pd.DataFrame:
         # =============================
         for l in lines:
             if l.startswith("*") and l.endswith("*"):
-                nama = l.replace("*","").strip()
+                nama = l.replace("*", "").strip()
                 break
 
         # =============================
         # NAMA FORMAT RAW WA
         # =============================
         if not nama:
-            for i,l in enumerate(lines):
+            for i, l in enumerate(lines):
                 if re.fullmatch(r"\d{2}-\d{2}-\d{4}", l):
-                    if i+1 < len(lines):
-                        kandidat = lines[i+1].strip()
+                    if i + 1 < len(lines):
+                        kandidat = lines[i + 1].strip()
                         if not kandidat.isdigit() and "RP" not in kandidat.upper():
                             nama = kandidat
                             break
@@ -166,10 +163,10 @@ def parse(text: str) -> pd.DataFrame:
         # =============================
         # SALDO
         # =============================
-        saldo_match = re.search(r"Rp\s*:\s*([\d\.]+)", full_text, re.IGNORECASE)
+        saldo_matches = re.findall(r"Rp\s*:\s*([\d\.]+)", full_text, re.IGNORECASE)
 
-        if saldo_match:
-            clean_saldo = saldo_match.group(1).replace(".","")
+        for s in saldo_matches:
+            clean_saldo = s.replace(".", "")
             saldo_list.append(clean_saldo)
 
         # =============================
@@ -183,9 +180,9 @@ def parse(text: str) -> pd.DataFrame:
         # =============================
         # PERUSAHAAN
         # =============================
-        for i,l in enumerate(lines):
-            if "STATUS" in l.upper() and i+1 < len(lines):
-                perusahaan = lines[i+1]
+        for i, l in enumerate(lines):
+            if "STATUS" in l.upper() and i + 1 < len(lines):
+                perusahaan = lines[i + 1]
                 break
 
         # =============================
@@ -245,7 +242,6 @@ def parse(text: str) -> pd.DataFrame:
         fee = hitung_fee(total_saldo)
 
         if nik:
-
             data.append({
                 "NIK": nik,
                 "Nama": nama,
@@ -258,7 +254,6 @@ def parse(text: str) -> pd.DataFrame:
                 "Periode": periode,
                 "Sensor": sensor,
                 "Saldo": saldo,
-                "Total Saldo": total_saldo,
                 "Fee": fee,
                 "Details": "",
                 "Akun": email
